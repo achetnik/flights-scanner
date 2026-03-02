@@ -86,6 +86,7 @@ class FlightScheduler:
                 job = session.get(Job, job_id)
                 if not job or job.status != JobStatus.ACTIVE:
                     return
+                session.expunge(job)  # detach from session while keeping loaded attrs
             await run_job(job, bot, chat_id)
 
         return run

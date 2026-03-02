@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
@@ -16,7 +16,7 @@ DEDUP_HOURS = 24
 
 
 def is_new_flight(session: Session, job_id: int, flight: FlightResult) -> bool:
-    cutoff = datetime.utcnow() - timedelta(hours=DEDUP_HOURS)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=DEDUP_HOURS)
     statement = select(SeenFlight).where(
         SeenFlight.job_id == job_id,
         SeenFlight.flight_fingerprint == flight.fingerprint,
@@ -32,7 +32,7 @@ def mark_flight_seen(session: Session, job_id: int, flight: FlightResult) -> Non
     )
     existing = session.exec(statement).first()
     if existing:
-        existing.last_alerted_at = datetime.utcnow()
+        existing.last_alerted_at = datetime.now(timezone.utc)
         session.add(existing)
     else:
         seen = SeenFlight(job_id=job_id, flight_fingerprint=flight.fingerprint)
@@ -89,6 +89,6 @@ async def run_job(job: Job, bot, chat_id: str) -> None:
     with Session(engine) as session:
         db_job = session.get(Job, job.id)
         if db_job:
-            db_job.last_run_at = datetime.utcnow()
+            db_job.last_run_at = datetime.now(timezone.utc)
             session.add(db_job)
             session.commit()

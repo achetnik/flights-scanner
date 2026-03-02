@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlmodel import Session, select
 from telegram import Update
@@ -33,7 +33,11 @@ async def cmd_stopjob(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if not context.args:
         await update.message.reply_text("Usage: /stopjob <job_id>")
         return
-    job_id = int(context.args[0])
+    try:
+        job_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("Job ID must be a number.")
+        return
     engine = get_engine()
     with Session(engine) as session:
         job = session.get(Job, job_id)
@@ -53,7 +57,11 @@ async def cmd_pausejob(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not context.args:
         await update.message.reply_text("Usage: /pausejob <job_id>")
         return
-    job_id = int(context.args[0])
+    try:
+        job_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("Job ID must be a number.")
+        return
     engine = get_engine()
     with Session(engine) as session:
         job = session.get(Job, job_id)
@@ -73,7 +81,11 @@ async def cmd_resumejob(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if not context.args:
         await update.message.reply_text("Usage: /resumejob <job_id>")
         return
-    job_id = int(context.args[0])
+    try:
+        job_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("Job ID must be a number.")
+        return
     engine = get_engine()
     with Session(engine) as session:
         job = session.get(Job, job_id)
@@ -101,6 +113,6 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         f"Active jobs: {active}\n"
         f"Paused jobs: {paused}\n"
         f"Total jobs: {len(jobs)}\n"
-        f"Time: {datetime.utcnow().strftime('%H:%M UTC')}",
+        f"Time: {datetime.now(timezone.utc).strftime('%H:%M UTC')}",
         parse_mode="Markdown",
     )

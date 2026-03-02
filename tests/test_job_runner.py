@@ -1,6 +1,6 @@
 import json
 import pytest
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from sqlmodel import Session, SQLModel, create_engine
 from database import Job, SeenFlight, JobStatus
@@ -63,7 +63,7 @@ def test_is_new_flight_returns_true_after_24h(engine, sample_job):
         seen = SeenFlight(
             job_id=sample_job.id,
             flight_fingerprint=flight.fingerprint,
-            last_alerted_at=datetime.utcnow() - timedelta(hours=25),
+            last_alerted_at=datetime.now(timezone.utc) - timedelta(hours=25),
         )
         session.add(seen)
         session.commit()
