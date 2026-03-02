@@ -20,26 +20,28 @@ Designed for **2 adults with 10 kg bags**. Runs 24/7 on Railway (free tier) — 
 ## System Architecture
 
 ```mermaid
-architecture-beta
-    group cloud(cloud)[Railway Cloud]
+flowchart LR
+    subgraph Railway["Railway Cloud"]
+        BOT["Telegram Bot\n/newjob /listjobs\n/stop /pause /resume"]
+        SCH["APScheduler\nper-job interval"]
+        RUN["Job Runner\nscrape + dedup + alert"]
+        DB[("SQLite\nJobs + SeenFlights")]
+    end
 
-    service bot(internet)[Telegram Bot] in cloud
-    service scheduler(server)[APScheduler] in cloud
-    service scrapers(server)[Scrapers] in cloud
-    service db(database)[SQLite DB] in cloud
+    subgraph Airlines["Airline APIs"]
+        RY["Ryanair\nAvailability API"]
+        EJ["EasyJet\nRoute Pricing API"]
+        WZ["Wizzair\nTimetable API\nPlaywright cookie"]
+    end
 
-    group airlines(internet)[Airline APIs]
-    service ryanair(internet)[Ryanair API]
-    service easyjet(internet)[EasyJet API]
-    service wizzair(internet)[Wizzair + Playwright]
-
-    bot:R --> L:scheduler
-    scheduler:R --> L:scrapers
-    scrapers:B --> T:db
-    bot:B --> T:db
-    scrapers:R --> L:ryanair
-    scrapers:R --> L:easyjet
-    scrapers:R --> L:wizzair
+    YOU["You on Telegram"] <-->|commands + alerts| BOT
+    BOT --> DB
+    BOT --> SCH
+    SCH -->|every N min| RUN
+    RUN --> DB
+    RUN --> RY
+    RUN --> EJ
+    RUN --> WZ
 ```
 
 ---
@@ -64,8 +66,8 @@ flowchart TD
     WZ -->|flights| R
 
     R -->|fingerprint check| DB
-    DB -->|already seen\n< 24h| SKIP[🚫 Skip]
-    DB -->|new or\nexpired| ALERT[📨 Send Alert]
+    DB -->|seen under 24h ago| SKIP[Skip]
+    DB -->|new or expired| ALERT[Send Alert]
     ALERT -->|mark seen| DB
     ALERT -->|Telegram message| U
 ```
@@ -76,15 +78,15 @@ flowchart TD
 
 ```mermaid
 stateDiagram-v2
-    [*] --> ACTIVE : /newjob wizard complete
+    [*] --> ACTIVE : /newjob complete
 
-    ACTIVE --> PAUSED : /pausejob &lt;id&gt;
-    PAUSED --> ACTIVE : /resumejob &lt;id&gt;
+    ACTIVE --> PAUSED : /pausejob
+    PAUSED --> ACTIVE : /resumejob
 
-    ACTIVE --> STOPPED : /stopjob &lt;id&gt;
-    PAUSED --> STOPPED : /stopjob &lt;id&gt;
+    ACTIVE --> STOPPED : /stopjob
+    PAUSED --> STOPPED : /stopjob
 
-    ACTIVE --> ACTIVE : scheduler tick\n→ scrape → alert
+    ACTIVE --> ACTIVE : scrape and alert on each tick
 
     STOPPED --> [*]
 ```
@@ -96,7 +98,7 @@ stateDiagram-v2
 ```mermaid
 flowchart LR
     F[FlightResult] -->|SHA-256 of\nairline+flight_no\n+date+route| FP[fingerprint]
-    FP --> Q{In seen_flights\nwith last_alerted_at\n≥ now − 24h?}
+    FP --> Q{In seen_flights with\nlast_alerted_at >= now - 24h?}
     Q -->|Yes| SKIP[Skip — already alerted]
     Q -->|No| SEND[Send Telegram alert]
     SEND --> UPSERT[Upsert seen_flights\nrow with now]
