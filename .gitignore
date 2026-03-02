@@ -1,0 +1,6 @@
+.env
+*.db
+__pycache__/
+.playwright/
+*.pyc
+.pytest_cache/
