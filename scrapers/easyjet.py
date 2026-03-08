@@ -1,7 +1,8 @@
+import asyncio
 import httpx
 import logging
 from datetime import date, datetime, time
-from typing import List
+from typing import List, Optional
 
 from playwright.async_api import async_playwright
 from models import JobConfig, FlightResult
@@ -9,6 +10,9 @@ from scrapers.base import BaseScraper
 
 EASYJET_API_URL = (
     "https://www.easyjet.com/ejavailability/api/v16/availability/query"
+)
+EASYJET_ROUTES_URL = (
+    "https://www.easyjet.com/ejcms/cache/route-cards/{origin}"
 )
 EASYJET_HOME = "https://www.easyjet.com/en/"
 
@@ -23,8 +27,20 @@ HEADERS = {
 logger = logging.getLogger(__name__)
 
 
+COOKIE_TTL_SECONDS = 600  # cache Playwright cookies for 10 minutes
+
+
 class EasyJetScraper(BaseScraper):
     airline_name = "easyjet"
+
+    # Sentinel to distinguish "never fetched" from "fetched but empty"
+    _NOT_FETCHED = object()
+
+    def __init__(self):
+        super().__init__()
+        self._cached_cookies = self._NOT_FETCHED
+        self._cookies_fetched_at: Optional[datetime] = None
+        self._cookie_lock = asyncio.Lock()
 
     async def search(
         self,
@@ -32,8 +48,15 @@ class EasyJetScraper(BaseScraper):
         destination: str,
         job: JobConfig,
     ) -> List[FlightResult]:
-        results = []
         cookies = await self._get_session_cookies()
+        if not cookies:
+            # Playwright failed to get cookies — skip search entirely
+            # to avoid dozens of doomed requests timing out against Akamai.
+            logger.info(
+                f"EasyJet: skipping {origin}->{destination} (no session cookies)"
+            )
+            return []
+        results = []
         current = job.date_from
         while current <= job.date_to:
             flights = await self._fetch_day(
@@ -44,6 +67,30 @@ class EasyJetScraper(BaseScraper):
         return results
 
     async def _get_session_cookies(self) -> dict:
+        """Return Akamai session cookies, using a cache to avoid repeated Playwright launches.
+
+        Cookies are cached for up to COOKIE_TTL_SECONDS (10 min).  An
+        asyncio.Lock prevents multiple concurrent callers from all spawning
+        their own browser — only the first one fetches, the rest wait and
+        then share the cached result.
+        """
+        async with self._cookie_lock:
+            # Check cache under lock
+            if self._cached_cookies is not self._NOT_FETCHED and self._cookies_fetched_at is not None:
+                age = (datetime.now() - self._cookies_fetched_at).total_seconds()
+                if age < COOKIE_TTL_SECONDS:
+                    return self._cached_cookies
+
+            # Cache miss — launch Playwright once.
+            # Cache the result whether it's empty or not: if Playwright
+            # fails (e.g. missing system deps), retrying 40+ times in the
+            # same session won't help and just fills the logs.
+            cookies = await self._fetch_cookies_via_playwright()
+            self._cached_cookies = cookies
+            self._cookies_fetched_at = datetime.now()
+            return cookies
+
+    async def _fetch_cookies_via_playwright(self) -> dict:
         """Load EasyJet homepage via Playwright to obtain Akamai session cookies."""
         try:
             async with async_playwright() as p:
@@ -95,7 +142,7 @@ class EasyJetScraper(BaseScraper):
             headers["Cookie"] = cookie_str
 
         try:
-            async with httpx.AsyncClient(headers=headers, timeout=30) as client:
+            async with httpx.AsyncClient(headers=headers, timeout=30, follow_redirects=True) as client:
                 response = await client.get(EASYJET_API_URL, params=params)
                 response.raise_for_status()
                 data = response.json()
@@ -152,6 +199,36 @@ class EasyJetScraper(BaseScraper):
                 flight_number=flight_number,
             ))
         return results
+
+    async def get_destinations(self, origin: str) -> List[str]:
+        """Discover destinations from *origin* via EasyJet route-cards API.
+
+        Falls back to an empty list if the endpoint is blocked by Akamai or
+        returns an unexpected format.  The day-trips module has its own
+        fallback that searches all known destinations for airlines without
+        route discovery, so this is best-effort.
+        """
+        url = EASYJET_ROUTES_URL.format(origin=origin)
+        try:
+            async with httpx.AsyncClient(headers=HEADERS, timeout=15, follow_redirects=True) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                data = response.json()
+            destinations = []
+            # Response is a list of route objects with an "iata" field
+            items = data if isinstance(data, list) else data.get("routes", [])
+            for item in items:
+                iata = (
+                    item.get("iata")
+                    or item.get("arrivalAirportCode")
+                    or item.get("ArrivalIata")
+                )
+                if iata and isinstance(iata, str) and len(iata) == 3:
+                    destinations.append(iata.upper())
+            return destinations
+        except Exception as e:
+            logger.warning(f"EasyJet: route discovery failed for {origin}: {e}")
+            return []
 
     def _build_booking_url(self, origin: str, destination: str, dep_date: date) -> str:
         d = dep_date.strftime("%Y-%m-%d")

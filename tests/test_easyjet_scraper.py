@@ -114,3 +114,44 @@ async def test_easyjet_handles_timeout_gracefully():
 
     # Should return empty, not raise
     assert flights == []
+
+
+@pytest.mark.asyncio
+async def test_easyjet_get_destinations():
+    mock_routes = [
+        {"iata": "BCN"},
+        {"iata": "FCO"},
+        {"iata": "AMS"},
+    ]
+
+    with patch("scrapers.easyjet.httpx.AsyncClient") as mock_client_cls:
+        mock_response = MagicMock()
+        mock_response.json.return_value = mock_routes
+        mock_response.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client_cls.return_value = mock_client
+
+        scraper = EasyJetScraper()
+        dests = await scraper.get_destinations("BRS")
+
+    assert dests == ["BCN", "FCO", "AMS"]
+
+
+@pytest.mark.asyncio
+async def test_easyjet_get_destinations_fallback_on_error():
+    """get_destinations returns [] when the API is blocked/fails."""
+    with patch("scrapers.easyjet.httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(side_effect=Exception("Akamai blocked"))
+        mock_client_cls.return_value = mock_client
+
+        scraper = EasyJetScraper()
+        dests = await scraper.get_destinations("BRS")
+
+    assert dests == []

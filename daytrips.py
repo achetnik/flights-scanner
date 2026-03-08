@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 MIDDAY = time(12, 0)
 AFTERNOON = time(16, 0)
 
+# Limit concurrent API requests to avoid overwhelming airline APIs
+# (rate limiting / 429 errors).  5 is a safe middle ground.
+MAX_CONCURRENT_REQUESTS = 5
+
 
 @dataclass
 class DayTripResult:
@@ -77,6 +81,7 @@ async def _fetch_flights_for_day(
     origin: str,
     destination: str,
     day: date,
+    semaphore: asyncio.Semaphore,
 ) -> List[FlightResult]:
     """Search a single airline for flights on a single day."""
     job = JobConfig(
@@ -87,13 +92,14 @@ async def _fetch_flights_for_day(
         date_to=day,
         passengers=1,
     )
-    try:
-        return await scraper.search(origin, destination, job)
-    except Exception as e:
-        logger.warning(
-            f"{scraper.airline_name} {origin}->{destination} on {day}: {e}"
-        )
-        return []
+    async with semaphore:
+        try:
+            return await scraper.search(origin, destination, job)
+        except Exception as e:
+            logger.warning(
+                f"{scraper.airline_name} {origin}->{destination} on {day}: {e}"
+            )
+            return []
 
 
 async def search_day_trips(
@@ -145,6 +151,9 @@ async def search_day_trips(
         except ValueError:
             continue
 
+    # Semaphore limits concurrent API requests to avoid 429 rate limiting
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+
     results: List[DayTripResult] = []
     current = date_from
     while current <= date_to:
@@ -155,20 +164,23 @@ async def search_day_trips(
         outbound_tasks = []
         for scraper in scrapers:
             reachable = set(airline_dests.get(scraper.airline_name, []))
+            # Fallback: airlines without route discovery try all destinations
+            has_routes = bool(reachable)
             for dest in all_destinations:
-                if dest in reachable:
+                if not has_routes or dest in reachable:
                     outbound_tasks.append(
-                        _fetch_flights_for_day(scraper, origin, dest, day)
+                        _fetch_flights_for_day(scraper, origin, dest, day, semaphore)
                     )
 
         # Collect return flights (dest -> origin) for the same day
         return_tasks = []
         for scraper in scrapers:
             reachable = set(airline_dests.get(scraper.airline_name, []))
+            has_routes = bool(reachable)
             for dest in all_destinations:
-                if dest in reachable:
+                if not has_routes or dest in reachable:
                     return_tasks.append(
-                        _fetch_flights_for_day(scraper, dest, origin, day)
+                        _fetch_flights_for_day(scraper, dest, origin, day, semaphore)
                     )
 
         # Run all tasks concurrently
