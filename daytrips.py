@@ -198,19 +198,18 @@ async def search_day_trips(
                 if _qualifies_return(flight):
                     return_by_dest.setdefault(flight.origin, []).append(flight)
 
-        # 3. Match: for each destination, pair cheapest outbound with cheapest return
+        # 3. Match: for each destination, keep only the cheapest pair
         for dest in all_destinations:
             outs = outbound_by_dest.get(dest, [])
             rets = return_by_dest.get(dest, [])
             if not outs or not rets:
                 continue
-            # Generate all valid pairs and keep them all (sort globally later)
-            for out_flight in outs:
-                for ret_flight in rets:
-                    results.append(DayTripResult(
-                        outbound=out_flight,
-                        return_flight=ret_flight,
-                    ))
+            cheapest_out = min(outs, key=lambda f: f.price_gbp)
+            cheapest_ret = min(rets, key=lambda f: f.price_gbp)
+            results.append(DayTripResult(
+                outbound=cheapest_out,
+                return_flight=cheapest_ret,
+            ))
 
     # 4. Sort by total price
     results.sort(key=lambda r: r.total_price)
