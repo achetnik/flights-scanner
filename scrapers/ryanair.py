@@ -1,11 +1,14 @@
 import httpx
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import List
 
 from models import JobConfig, FlightResult
 from scrapers.base import BaseScraper
 
 RYANAIR_AVAILABILITY_URL = "https://www.ryanair.com/api/booking/v4/availability"
+RYANAIR_ROUTES_URL = (
+    "https://www.ryanair.com/api/views/locate/searchWidget/routes/en/airport/{origin}"
+)
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -73,17 +76,45 @@ class RyanairScraper(BaseScraper):
                     if price <= 0:
                         continue
                     flight_number = flight.get("flightNumber", "")
+                    # Extract departure and arrival times
+                    times = flight.get("time", [])
+                    dep_time = None
+                    arr_time = None
+                    if len(times) >= 2:
+                        try:
+                            dep_time = datetime.strptime(
+                                times[0][:19], "%Y-%m-%dT%H:%M:%S"
+                            ).time()
+                            arr_time = datetime.strptime(
+                                times[1][:19], "%Y-%m-%dT%H:%M:%S"
+                            ).time()
+                        except (ValueError, IndexError):
+                            pass
                     booking_url = self._build_booking_url(origin, destination, dep_date)
                     results.append(FlightResult(
                         airline="ryanair",
                         origin=origin,
                         destination=destination,
                         departure_date=dep_date,
+                        departure_time=dep_time,
+                        arrival_time=arr_time,
                         price_eur=price,
                         booking_url=booking_url,
                         flight_number=flight_number,
                     ))
         return results
+
+    async def get_destinations(self, origin: str) -> List[str]:
+        url = RYANAIR_ROUTES_URL.format(origin=origin)
+        async with httpx.AsyncClient(headers=HEADERS, timeout=15) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            data = response.json()
+        return [
+            route["arrivalAirport"]["code"]
+            for route in data
+            if "arrivalAirport" in route
+        ]
 
     def _build_booking_url(self, origin: str, destination: str, dep_date: date) -> str:
         d = dep_date.strftime("%Y-%m-%d")

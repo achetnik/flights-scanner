@@ -4,3 +4,6 @@ __pycache__/
 .playwright/
 *.pyc
 .pytest_cache/
+.DS_Store
+.venv/
+.claude/

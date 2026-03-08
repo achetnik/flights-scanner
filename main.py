@@ -38,6 +38,16 @@ from bot.wizard import (
     confirm_job,
     newjob_start,
 )
+from bot.daytrip_wizard import (
+    DT_ASK_ORIGIN,
+    DT_ASK_DATE_RANGE,
+    DT_ASK_AIRLINES,
+    daytrip_start,
+    dt_ask_date_range,
+    dt_ask_airlines,
+    dt_run_search,
+    dt_cancel,
+)
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -68,6 +78,19 @@ newjob_handler = ConversationHandler(
 )
 
 application.add_handler(newjob_handler)
+
+# /daytrip conversation
+daytrip_handler = ConversationHandler(
+    entry_points=[CommandHandler("daytrip", daytrip_start)],
+    states={
+        DT_ASK_ORIGIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, dt_ask_date_range)],
+        DT_ASK_DATE_RANGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, dt_ask_airlines)],
+        DT_ASK_AIRLINES: [MessageHandler(filters.TEXT & ~filters.COMMAND, dt_run_search)],
+    },
+    fallbacks=[CommandHandler("cancel", dt_cancel)],
+)
+application.add_handler(daytrip_handler)
+
 application.add_handler(CommandHandler("listjobs", cmd_listjobs))
 application.add_handler(CommandHandler("stopjob", cmd_stopjob))
 application.add_handler(CommandHandler("pausejob", cmd_pausejob))

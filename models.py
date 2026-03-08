@@ -1,5 +1,5 @@
 import hashlib
-from datetime import date
+from datetime import date, time
 from typing import List, Optional
 from pydantic import BaseModel, field_validator
 
@@ -32,6 +32,8 @@ class FlightResult(BaseModel):
     booking_url: str
     flight_number: str
     return_date: Optional[date] = None
+    departure_time: Optional[time] = None
+    arrival_time: Optional[time] = None
 
     @property
     def fingerprint(self) -> str:

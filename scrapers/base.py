@@ -28,3 +28,12 @@ class BaseScraper(ABC):
     ) -> List[FlightResult]:
         """Search for flights. Return list of found flights (may be empty)."""
         ...
+
+    async def get_destinations(self, origin: str) -> List[str]:
+        """Return IATA codes of destinations reachable from *origin*.
+
+        Subclasses should override this with an airline-specific route API.
+        The default returns an empty list (meaning the airline has no
+        route-discovery capability).
+        """
+        return []
