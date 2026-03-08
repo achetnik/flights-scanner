@@ -147,7 +147,7 @@ class EasyJetScraper(BaseScraper):
                 departure_date=dep_dt.date(),
                 departure_time=dep_dt.time(),
                 arrival_time=arr_dt.time() if arr_dt else None,
-                price_eur=price,
+                price_gbp=price,
                 booking_url=self._build_booking_url(origin, destination, dep_dt.date()),
                 flight_number=flight_number,
             ))

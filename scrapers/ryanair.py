@@ -98,7 +98,7 @@ class RyanairScraper(BaseScraper):
                         departure_date=dep_date,
                         departure_time=dep_time,
                         arrival_time=arr_time,
-                        price_eur=price,
+                        price_gbp=price,
                         booking_url=booking_url,
                         flight_number=flight_number,
                     ))

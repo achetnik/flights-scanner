@@ -59,7 +59,7 @@ async def test_wizzair_parses_flights():
 
     assert len(flights) == 2  # Two departure times for the same date
     assert flights[0].airline == "wizzair"
-    assert flights[0].price_eur == 75.0
+    assert flights[0].price_gbp == 75.0
     assert flights[0].departure_date == date(2025, 6, 14)
     assert flights[0].departure_time == time(8, 20)
     assert flights[1].departure_time == time(15, 40)

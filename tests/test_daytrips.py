@@ -29,7 +29,7 @@ def _flight(
         departure_date=dep_date,
         departure_time=dep_time,
         arrival_time=arr_time,
-        price_eur=price,
+        price_gbp=price,
         booking_url="https://example.com",
         flight_number=flight_number,
     )
@@ -266,7 +266,7 @@ class TestFormatDayTrip:
         )
         trip = DayTripResult(outbound=out, return_flight=ret)
         text = format_day_trip(trip, 1)
-        assert "BRS -> BCN" in text
+        assert "Bristol (BRS) -> Barcelona (BCN)" in text
         assert "07:00" in text
         assert "18:00" in text
         assert "75.00" in text

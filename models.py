@@ -28,7 +28,7 @@ class FlightResult(BaseModel):
     origin: str
     destination: str
     departure_date: date
-    price_eur: float
+    price_gbp: float
     booking_url: str
     flight_number: str
     return_date: Optional[date] = None

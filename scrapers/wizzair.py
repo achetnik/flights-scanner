@@ -90,7 +90,7 @@ class WizzairScraper(BaseScraper):
                     destination=arr_station,
                     departure_date=dep_date,
                     departure_time=dep_time,
-                    price_eur=price,
+                    price_gbp=price,
                     booking_url=self._build_booking_url(
                         dep_station, arr_station, dep_date, job_passengers=1,
                     ),

@@ -54,7 +54,7 @@ def _flight(
         departure_date=dep_date,
         departure_time=dep_time,
         arrival_time=arr_time,
-        price_eur=price,
+        price_gbp=price,
         booking_url="https://example.com",
         flight_number=flight_number,
     )
@@ -82,15 +82,19 @@ class TestFormatDayTripTelegram:
         trip = DayTripResult(outbound=out, return_flight=ret)
         text = format_day_trip_telegram(trip, 1)
 
-        assert "BRS → BCN" in text
+        assert "Bristol (BRS) → Barcelona (BCN)" in text
         assert "#1" in text
         assert "07:00" in text
         assert "18:00" in text
         assert "75.00" in text
+        assert "£" in text
         assert "Ryanair" in text
         assert "Wizzair" in text
         assert "✈️" in text
         assert "💰" in text
+        assert "Book outbound" in text
+        assert "Book return" in text
+        assert "https://example.com" in text
 
     def test_missing_times_show_question_mark(self):
         out = _flight(dep_time=None, arr_time=None, price=10.0)

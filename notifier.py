@@ -1,3 +1,4 @@
+from airports import airport_name
 from models import FlightResult
 from telegram import Bot
 from telegram.constants import ParseMode
@@ -6,11 +7,13 @@ from telegram.constants import ParseMode
 def format_flight_message(flight: FlightResult, job_name: str, job_id: int) -> str:
     label = f"{job_name} #{job_id}" if job_name else f"Job #{job_id}"
     dep = flight.departure_date.strftime("%b %d, %Y")
+    origin = airport_name(flight.origin)
+    dest = airport_name(flight.destination)
     return (
         f"🚀 *New flight found!* [{label}]\n"
-        f"{flight.origin} → {flight.destination} | {flight.airline.title()} {flight.flight_number}\n"
+        f"{origin} → {dest} | {flight.airline.title()} {flight.flight_number}\n"
         f"📅 {dep}\n"
-        f"💰 €{flight.price_eur:.2f}/person — 2 adults, 10kg bags\n"
+        f"💰 £{flight.price_gbp:.2f}/person — 2 adults, 10kg bags\n"
         f"[Book now →]({flight.booking_url})"
     )
 

@@ -11,14 +11,14 @@ def test_format_flight_message():
         origin="TLV",
         destination="FCO",
         departure_date=date(2025, 6, 14),
-        price_eur=89.99,
+        price_gbp=89.99,
         booking_url="https://ryanair.com/book",
         flight_number="FR1234",
     )
     msg = format_flight_message(flight, job_name="Summer Europe", job_id=3)
     assert "FR1234" in msg
-    assert "TLV" in msg
-    assert "FCO" in msg
+    assert "Tel Aviv (TLV)" in msg
+    assert "Rome Fiumicino (FCO)" in msg
     assert "89.99" in msg
     assert "https://ryanair.com/book" in msg
     assert "Summer Europe" in msg or "#3" in msg
@@ -31,7 +31,7 @@ async def test_send_flight_alert_calls_telegram():
         origin="TLV",
         destination="FCO",
         departure_date=date(2025, 6, 14),
-        price_eur=89.99,
+        price_gbp=89.99,
         booking_url="https://ryanair.com/book",
         flight_number="FR1234",
     )

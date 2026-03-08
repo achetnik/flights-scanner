@@ -55,7 +55,7 @@ async def test_ryanair_parses_flights():
     assert len(flights) == 1
     assert flights[0].airline == "ryanair"
     assert flights[0].flight_number == "FR1234"
-    assert flights[0].price_eur == 89.99
+    assert flights[0].price_gbp == 89.99
     assert flights[0].departure_date == date(2025, 6, 14)
     assert "ryanair.com" in flights[0].booking_url
 

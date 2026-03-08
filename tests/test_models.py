@@ -20,7 +20,7 @@ def test_flight_result_fingerprint():
         origin="TLV",
         destination="FCO",
         departure_date=date(2025, 6, 14),
-        price_eur=89.0,
+        price_gbp=89.0,
         booking_url="https://ryanair.com/...",
         flight_number="FR1234",
     )
@@ -34,7 +34,7 @@ def test_flight_result_fingerprint_is_deterministic():
         origin="TLV",
         destination="FCO",
         departure_date=date(2025, 6, 14),
-        price_eur=89.0,
+        price_gbp=89.0,
         booking_url="https://ryanair.com/...",
         flight_number="FR1234",
     )

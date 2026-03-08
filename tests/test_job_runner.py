@@ -35,7 +35,7 @@ def sample_job(engine):
 def test_is_new_flight_returns_true_for_unseen(engine, sample_job):
     flight = FlightResult(
         airline="ryanair", origin="TLV", destination="FCO",
-        departure_date=date(2025, 6, 14), price_eur=89.0,
+        departure_date=date(2025, 6, 14), price_gbp=89.0,
         booking_url="https://ryanair.com", flight_number="FR1234",
     )
     with Session(engine) as session:
@@ -45,7 +45,7 @@ def test_is_new_flight_returns_true_for_unseen(engine, sample_job):
 def test_is_new_flight_returns_false_for_recently_seen(engine, sample_job):
     flight = FlightResult(
         airline="ryanair", origin="TLV", destination="FCO",
-        departure_date=date(2025, 6, 14), price_eur=89.0,
+        departure_date=date(2025, 6, 14), price_gbp=89.0,
         booking_url="https://ryanair.com", flight_number="FR1234",
     )
     with Session(engine) as session:
@@ -56,7 +56,7 @@ def test_is_new_flight_returns_false_for_recently_seen(engine, sample_job):
 def test_is_new_flight_returns_true_after_24h(engine, sample_job):
     flight = FlightResult(
         airline="ryanair", origin="TLV", destination="FCO",
-        departure_date=date(2025, 6, 14), price_eur=89.0,
+        departure_date=date(2025, 6, 14), price_gbp=89.0,
         booking_url="https://ryanair.com", flight_number="FR1234",
     )
     with Session(engine) as session:

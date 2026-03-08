@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import date, time, timedelta
 from typing import Dict, List, Optional
 
+from airports import airport_name
 from models import FlightResult, JobConfig
 from scrapers.base import BaseScraper
 from scrapers.registry import get_scraper, list_scrapers
@@ -35,7 +36,7 @@ class DayTripResult:
     total_price: float = field(init=False)
 
     def __post_init__(self):
-        self.total_price = self.outbound.price_eur + self.return_flight.price_eur
+        self.total_price = self.outbound.price_gbp + self.return_flight.price_gbp
 
 
 async def _discover_destinations(
@@ -224,14 +225,16 @@ def format_day_trip(trip: DayTripResult, rank: int) -> str:
     arr_time = out.arrival_time.strftime("%H:%M") if out.arrival_time else "?"
     ret_dep = ret.departure_time.strftime("%H:%M") if ret.departure_time else "?"
     ret_arr = ret.arrival_time.strftime("%H:%M") if ret.arrival_time else "?"
+    origin = airport_name(out.origin)
+    dest = airport_name(out.destination)
     return (
-        f"#{rank} {out.origin} -> {out.destination} "
+        f"#{rank} {origin} -> {dest} "
         f"| {out.departure_date.strftime('%a %d %b')}\n"
         f"  OUT: {out.airline.title()} {dep_time}->{arr_time} "
-        f"EUR {out.price_eur:.2f}\n"
+        f"£{out.price_gbp:.2f}\n"
         f"  RET: {ret.airline.title()} {ret_dep}->{ret_arr} "
-        f"EUR {ret.price_eur:.2f}\n"
-        f"  TOTAL: EUR {trip.total_price:.2f}"
+        f"£{ret.price_gbp:.2f}\n"
+        f"  TOTAL: £{trip.total_price:.2f}"
     )
 
 
@@ -244,9 +247,12 @@ def format_day_trip_telegram(trip: DayTripResult, rank: int) -> str:
     ret_dep = ret.departure_time.strftime("%H:%M") if ret.departure_time else "?"
     ret_arr = ret.arrival_time.strftime("%H:%M") if ret.arrival_time else "?"
     date_str = out.departure_date.strftime("%a %d %b")
+    origin = airport_name(out.origin)
+    dest = airport_name(out.destination)
     return (
-        f"✈️ *#{rank} — {out.origin} → {out.destination}* | {date_str}\n"
-        f"🛫 {out.airline.title()} {dep_time}→{arr_time} | €{out.price_eur:.2f}\n"
-        f"🛬 {ret.airline.title()} {ret_dep}→{ret_arr} | €{ret.price_eur:.2f}\n"
-        f"💰 *Total: €{trip.total_price:.2f}*"
+        f"✈️ *#{rank} — {origin} → {dest}* | {date_str}\n"
+        f"🛫 {out.airline.title()} {dep_time}→{arr_time} | £{out.price_gbp:.2f}\n"
+        f"🛬 {ret.airline.title()} {ret_dep}→{ret_arr} | £{ret.price_gbp:.2f}\n"
+        f"💰 *Total: £{trip.total_price:.2f}*\n"
+        f"🔗 [Book outbound →]({out.booking_url}) | [Book return →]({ret.booking_url})"
     )

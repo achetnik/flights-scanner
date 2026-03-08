@@ -15,7 +15,7 @@ class ConcreteTestScraper(BaseScraper):
                 origin=origin,
                 destination=destination,
                 departure_date=date(2025, 6, 14),
-                price_eur=99.0,
+                price_gbp=99.0,
                 booking_url="https://test.com",
                 flight_number="T001",
             )

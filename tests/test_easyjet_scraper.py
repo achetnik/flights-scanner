@@ -49,7 +49,7 @@ async def test_easyjet_parses_flights():
     assert len(flights) == 1
     assert flights[0].airline == "easyjet"
     assert flights[0].flight_number == "EJU1234"
-    assert flights[0].price_eur == 105.00
+    assert flights[0].price_gbp == 105.00
     assert flights[0].departure_date == date(2025, 6, 14)
     assert flights[0].departure_time == time(7, 30)
     assert flights[0].arrival_time == time(10, 30)
