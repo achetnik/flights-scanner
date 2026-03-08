@@ -8,7 +8,6 @@ from models import JobConfig, FlightResult
 from scrapers.base import BaseScraper
 
 WIZZAIR_BUILDNUMBER_URL = "https://www.wizzair.com/buildnumber"
-WIZZAIR_SEARCH_TEMPLATE = "https://be.wizzair.com/{version}/Api/search/search"
 WIZZAIR_TIMETABLE_TEMPLATE = "https://be.wizzair.com/{version}/Api/search/timetable"
 WIZZAIR_MAP_TEMPLATE = "https://be.wizzair.com/{version}/Api/asset/map?languageCode=en-gb"
 
@@ -33,9 +32,6 @@ class WizzairScraper(BaseScraper):
 
     def __init__(self):
         super().__init__()
-        # Tracks whether the search endpoint has been proven to work.
-        # None = untested, True = works, False = failed on first attempt.
-        self._search_works: Optional[bool] = None
         # Cache the API version so we don't fetch it for every destination.
         self._cached_version: Optional[str] = None
         # Lock prevents concurrent coroutines from all fetching the version
@@ -54,139 +50,23 @@ class WizzairScraper(BaseScraper):
         destination: str,
         job: JobConfig,
     ) -> List[FlightResult]:
-        results = []
+        """Search for flights using the timetable endpoint.
+
+        Makes ONE API call covering the entire date range (the timetable
+        endpoint returns all dates with prices in a single response).
+        This is far more efficient than one call per day.
+        """
         version = await self._ensure_version()
-        current = job.date_from
-        while current <= job.date_to:
-            flights = await self._fetch_day(origin, destination, current, job, version)
-            results.extend(flights)
-            current = current + timedelta(days=1)
-        return results
-
-    async def _fetch_day(
-        self,
-        origin: str,
-        destination: str,
-        dep_date: date,
-        job: JobConfig,
-        version: str,
-    ) -> List[FlightResult]:
-        # If the search endpoint hasn't been proven broken, try it first
-        # (it returns arrival times which we need for day-trip qualification).
-        if self._search_works is not False:
-            flights = await self._try_search_endpoint(
-                origin, destination, dep_date, job, version,
-            )
-            if flights:
-                self._search_works = True
-                return flights
-            # First failure — mark search as broken so we skip it next time
-            if self._search_works is None:
-                logger.info(
-                    "Wizzair: search endpoint returned no results, "
-                    "falling back to timetable + estimated arrival times"
-                )
-                self._search_works = False
-
-        # Fallback: timetable endpoint (works reliably but lacks arrival times,
-        # so we estimate them).
-        return await self._try_timetable_endpoint(
-            origin, destination, dep_date, job, version,
+        return await self._fetch_timetable(
+            origin, destination, job.date_from, job.date_to, job, version,
         )
 
-    # ------------------------------------------------------------------
-    # Search endpoint (preferred — includes arrival times)
-    # ------------------------------------------------------------------
-
-    async def _try_search_endpoint(
+    async def _fetch_timetable(
         self,
         origin: str,
         destination: str,
-        dep_date: date,
-        job: JobConfig,
-        version: str,
-    ) -> List[FlightResult]:
-        url = WIZZAIR_SEARCH_TEMPLATE.format(version=version)
-        payload = {
-            "flightList": [
-                {
-                    "departureStation": origin,
-                    "arrivalStation": destination,
-                    "departureDate": dep_date.strftime("%Y-%m-%d"),
-                }
-            ],
-            "adultCount": job.passengers,
-            "childCount": 0,
-            "infantCount": 0,
-            "wdc": True,
-        }
-        try:
-            async with httpx.AsyncClient(headers=HEADERS, timeout=30, follow_redirects=True) as client:
-                response = await client.post(url, json=payload)
-                response.raise_for_status()
-                data = response.json()
-            return self._parse_search_response(data, origin, destination)
-        except Exception as e:
-            logger.debug(f"Wizzair search endpoint: {origin}->{destination} on {dep_date}: {e}")
-            return []
-
-    def _parse_search_response(
-        self, data: dict, origin: str, destination: str,
-    ) -> List[FlightResult]:
-        """Parse the /Api/search/search response which includes arrival times."""
-        results = []
-        for flight in data.get("outboundFlights", []):
-            dep_str = flight.get("departureDateTime", "")
-            arr_str = flight.get("arrivalDateTime", "")
-            if not dep_str:
-                continue
-            dep_dt = datetime.strptime(dep_str[:19], "%Y-%m-%dT%H:%M:%S")
-            arr_dt = (
-                datetime.strptime(arr_str[:19], "%Y-%m-%dT%H:%M:%S")
-                if arr_str
-                else None
-            )
-            # Get cheapest fare from fares array
-            fares = flight.get("fares", [])
-            price = 0.0
-            for fare in fares:
-                discounted = fare.get("discountedPrice", {}).get("amount", 0)
-                base = fare.get("basePrice", {}).get("amount", 0)
-                fare_price = discounted if discounted > 0 else base
-                if fare_price > 0 and (price == 0 or fare_price < price):
-                    price = fare_price
-            if price <= 0:
-                continue
-            dep_station = flight.get("departureStation", origin)
-            arr_station = flight.get("arrivalStation", destination)
-            flight_number = flight.get(
-                "flightNumber",
-                f"W6-{dep_station}{arr_station}-{dep_str[:16]}",
-            )
-            results.append(FlightResult(
-                airline="wizzair",
-                origin=dep_station,
-                destination=arr_station,
-                departure_date=dep_dt.date(),
-                departure_time=dep_dt.time(),
-                arrival_time=arr_dt.time() if arr_dt else None,
-                price_gbp=price,
-                booking_url=self._build_booking_url(
-                    dep_station, arr_station, dep_dt.date(), job_passengers=1,
-                ),
-                flight_number=flight_number,
-            ))
-        return results
-
-    # ------------------------------------------------------------------
-    # Timetable endpoint (fallback — reliable but no arrival times)
-    # ------------------------------------------------------------------
-
-    async def _try_timetable_endpoint(
-        self,
-        origin: str,
-        destination: str,
-        dep_date: date,
+        date_from: date,
+        date_to: date,
         job: JobConfig,
         version: str,
     ) -> List[FlightResult]:
@@ -196,8 +76,8 @@ class WizzairScraper(BaseScraper):
                 {
                     "departureStation": origin,
                     "arrivalStation": destination,
-                    "from": dep_date.strftime("%Y-%m-%dT00:00:00"),
-                    "to": dep_date.strftime("%Y-%m-%dT00:00:00"),
+                    "from": date_from.strftime("%Y-%m-%dT00:00:00"),
+                    "to": date_to.strftime("%Y-%m-%dT00:00:00"),
                 }
             ],
             "priceType": "regular",
@@ -212,13 +92,20 @@ class WizzairScraper(BaseScraper):
                 data = response.json()
             return self._parse_timetable_response(data, origin, destination)
         except Exception as e:
-            logger.warning(f"Wizzair: {origin}->{destination} on {dep_date}: {e}")
+            logger.warning(
+                f"Wizzair: {origin}->{destination} "
+                f"({date_from} to {date_to}): {e}"
+            )
             return []
 
     def _parse_timetable_response(
         self, data: dict, origin: str, destination: str,
     ) -> List[FlightResult]:
-        """Parse the timetable response, estimating arrival times."""
+        """Parse the timetable response, estimating arrival times.
+
+        Each entry in ``outboundFlights`` contains a price and a list of
+        departure date-times.  We estimate arrival = departure + 3 h.
+        """
         results = []
         for flight in data.get("outboundFlights", []):
             price_info = flight.get("price", {})

@@ -7,6 +7,7 @@ AIRLINE_OPTIONS = {
     "1": "ryanair",
     "2": "easyjet",
     "3": "wizzair",
+    "4": "googleflights",
 }
 
 MONTH_MAP = {
@@ -38,7 +39,7 @@ def parse_iata_list(text: str) -> List[str]:
 
 def parse_airlines(text: str) -> List[str]:
     text = text.strip().lower()
-    if text in ("4", "all"):
+    if text in ("5", "all"):
         return list(AIRLINE_OPTIONS.values())
     codes = re.split(r"[\s,]+", text)
     result = []
@@ -145,8 +146,8 @@ async def ask_airlines(update, context):
     context.user_data["destinations"] = parse_iata_list(update.message.text)
     await update.message.reply_text(
         "Which airlines to check?\n"
-        "1. Ryanair\n2. EasyJet\n3. Wizzair\n4. All\n\n"
-        "Reply with number(s), e.g. `1 2` or `4` for all",
+        "1. Ryanair\n2. EasyJet\n3. Wizzair\n4. Google Flights\n5. All\n\n"
+        "Reply with number(s), e.g. `1 2` or `5` for all",
         parse_mode="Markdown",
     )
     return ASK_AIRLINES

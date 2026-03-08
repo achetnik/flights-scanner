@@ -248,6 +248,62 @@ class TestSearchDayTrips:
 
         assert results == []
 
+    @pytest.mark.asyncio
+    async def test_aggregator_scraper_searches_all_discovered_dests(self):
+        """Google Flights (no route discovery) should search destinations
+        discovered by other scrapers like Ryanair."""
+        outbound = _flight(
+            airline="easyjet",
+            origin="BRS", destination="BCN",
+            dep_time=time(7, 0), arr_time=time(10, 0),
+            price=45.0, flight_number="GF-E-BRSBCN-0700",
+        )
+        return_fl = _flight(
+            airline="easyjet",
+            origin="BCN", destination="BRS",
+            dep_time=time(18, 0), arr_time=time(21, 0),
+            price=50.0, flight_number="GF-E-BCNBRS-1800",
+        )
+
+        async def mock_search_gf(origin, destination, job):
+            if origin == "BRS" and destination == "BCN":
+                return [outbound]
+            if origin == "BCN" and destination == "BRS":
+                return [return_fl]
+            return []
+
+        async def mock_search_ryanair(origin, destination, job):
+            return []  # Ryanair has no flights this day
+
+        # Ryanair discovers BCN; Google Flights has no route discovery
+        ryanair_mock = AsyncMock()
+        ryanair_mock.airline_name = "ryanair"
+        ryanair_mock.get_destinations = AsyncMock(return_value=["BCN"])
+        ryanair_mock.search = mock_search_ryanair
+
+        gf_mock = AsyncMock()
+        gf_mock.airline_name = "googleflights"
+        gf_mock.get_destinations = AsyncMock(return_value=[])
+        gf_mock.search = mock_search_gf
+
+        def mock_get_scraper(name):
+            return {"ryanair": ryanair_mock, "googleflights": gf_mock}[name]
+
+        with patch("daytrips.get_scraper", side_effect=mock_get_scraper), \
+             patch("daytrips.list_scrapers",
+                   return_value=["ryanair", "googleflights"]):
+
+            results = await search_day_trips(
+                origin="BRS",
+                date_from=date(2025, 6, 14),
+                date_to=date(2025, 6, 14),
+                airlines=["googleflights"],
+            )
+
+        assert len(results) == 1
+        assert results[0].outbound.airline == "easyjet"
+        assert results[0].total_price == 95.0
+
 
 class TestFormatDayTrip:
     def test_format(self):

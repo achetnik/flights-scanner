@@ -3,11 +3,13 @@ from scrapers.base import BaseScraper
 from scrapers.ryanair import RyanairScraper
 from scrapers.easyjet import EasyJetScraper
 from scrapers.wizzair import WizzairScraper
+from scrapers.googleflights import GoogleFlightsScraper
 
 _REGISTRY = {
     "ryanair": RyanairScraper,
     "easyjet": EasyJetScraper,
     "wizzair": WizzairScraper,
+    "googleflights": GoogleFlightsScraper,
 }
 
 

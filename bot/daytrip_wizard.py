@@ -47,8 +47,8 @@ async def dt_ask_airlines(update, context):
     context.user_data["dt_date_to"] = end
     await update.message.reply_text(
         "Which airlines to search?\n"
-        "1. Ryanair\n2. EasyJet\n3. Wizzair\n4. All\n\n"
-        "Reply with number(s), e.g. `1 3` or `4` for all",
+        "1. Ryanair\n2. EasyJet\n3. Wizzair\n4. Google Flights\n5. All\n\n"
+        "Reply with number(s), e.g. `1 3` or `5` for all",
         parse_mode="Markdown",
     )
     return DT_ASK_AIRLINES

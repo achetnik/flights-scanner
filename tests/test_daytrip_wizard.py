@@ -202,7 +202,7 @@ class TestDtRunSearch:
         )
         mock_results = [DayTripResult(outbound=out, return_flight=ret)]
 
-        update = _make_update("4")
+        update = _make_update("5")
         context = _make_context()
         context.user_data["dt_origin"] = "BRS"
         context.user_data["dt_date_from"] = date(2026, 6, 1)
@@ -226,7 +226,7 @@ class TestDtRunSearch:
 
     @pytest.mark.asyncio
     async def test_no_results_message(self):
-        update = _make_update("4")
+        update = _make_update("5")
         context = _make_context()
         context.user_data["dt_origin"] = "XYZ"
         context.user_data["dt_date_from"] = date(2026, 6, 1)

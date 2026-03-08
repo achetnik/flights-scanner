@@ -10,8 +10,8 @@ def test_parse_iata_list():
 
 
 def test_parse_airlines_all():
-    assert set(parse_airlines("4")) == {"ryanair", "easyjet", "wizzair"}
-    assert set(parse_airlines("all")) == {"ryanair", "easyjet", "wizzair"}
+    assert set(parse_airlines("5")) == {"ryanair", "easyjet", "wizzair", "googleflights"}
+    assert set(parse_airlines("all")) == {"ryanair", "easyjet", "wizzair", "googleflights"}
 
 
 def test_parse_airlines_single():

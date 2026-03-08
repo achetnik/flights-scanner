@@ -127,8 +127,11 @@ async def search_day_trips(
     if airlines is None:
         airlines = list_scrapers()
 
-    # 1. Discover destinations reachable from origin across all airlines
-    airline_dests = await _discover_destinations(origin, airlines)
+    # 1. Discover destinations reachable from origin.
+    #    Always use ALL scrapers with route-discovery support (Ryanair,
+    #    Wizzair, etc.) so that aggregator-only airlines like Google Flights
+    #    still know which destinations to search.
+    airline_dests = await _discover_destinations(origin)  # all scrapers
     # Build a union of all destinations
     all_destinations = set()
     for dests in airline_dests.values():
@@ -160,28 +163,28 @@ async def search_day_trips(
         day = current
         current += timedelta(days=1)
 
-        # Collect outbound flights (origin -> dest) for this day
+        # Collect outbound flights (origin -> dest) for this day.
+        # Airline-specific scrapers (Ryanair, Wizzair) only search their own
+        # routes.  Aggregator scrapers without route discovery (Google Flights)
+        # search ALL destinations discovered by the other scrapers.
         outbound_tasks = []
         for scraper in scrapers:
             reachable = set(airline_dests.get(scraper.airline_name, []))
-            # Fallback: airlines without route discovery try all destinations
-            has_routes = bool(reachable)
-            for dest in all_destinations:
-                if not has_routes or dest in reachable:
-                    outbound_tasks.append(
-                        _fetch_flights_for_day(scraper, origin, dest, day, semaphore)
-                    )
+            search_dests = reachable if reachable else all_destinations
+            for dest in search_dests:
+                outbound_tasks.append(
+                    _fetch_flights_for_day(scraper, origin, dest, day, semaphore)
+                )
 
         # Collect return flights (dest -> origin) for the same day
         return_tasks = []
         for scraper in scrapers:
             reachable = set(airline_dests.get(scraper.airline_name, []))
-            has_routes = bool(reachable)
-            for dest in all_destinations:
-                if not has_routes or dest in reachable:
-                    return_tasks.append(
-                        _fetch_flights_for_day(scraper, dest, origin, day, semaphore)
-                    )
+            search_dests = reachable if reachable else all_destinations
+            for dest in search_dests:
+                return_tasks.append(
+                    _fetch_flights_for_day(scraper, dest, origin, day, semaphore)
+                )
 
         # Run all tasks concurrently
         all_results = await asyncio.gather(
