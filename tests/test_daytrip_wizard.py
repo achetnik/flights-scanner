@@ -175,6 +175,16 @@ class TestDtAskAirlines:
         assert context.user_data["dt_date_from"] == date(2026, 6, 1)
         assert context.user_data["dt_date_to"] == date(2026, 8, 31)
 
+    @pytest.mark.asyncio
+    async def test_single_month_format(self):
+        update = _make_update("March 2026")
+        context = _make_context()
+        state = await dt_ask_airlines(update, context)
+
+        assert state == DT_ASK_AIRLINES
+        assert context.user_data["dt_date_from"] == date(2026, 3, 1)
+        assert context.user_data["dt_date_to"] == date(2026, 3, 31)
+
 
 class TestDtRunSearch:
     @pytest.mark.asyncio

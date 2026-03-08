@@ -27,7 +27,7 @@ async def dt_ask_date_range(update, context):
     context.user_data["dt_origin"] = update.message.text.strip().upper()
     await update.message.reply_text(
         "Date range?\n"
-        "(e.g. `2026-06-01 to 2026-06-30` or `June to August 2026`)",
+        "(e.g. `2026-06-01 to 2026-06-30`, `June to August 2026`, or `March 2026`)",
         parse_mode="Markdown",
     )
     return DT_ASK_DATE_RANGE

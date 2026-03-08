@@ -36,6 +36,42 @@ def test_parse_date_range_natural():
     assert end == date(2025, 8, 31)
 
 
+def test_parse_date_range_single_month():
+    start, end = parse_date_range("March 2026")
+    assert start == date(2026, 3, 1)
+    assert end == date(2026, 3, 31)
+
+
+def test_parse_date_range_single_month_abbreviated():
+    start, end = parse_date_range("Mar 2026")
+    assert start == date(2026, 3, 1)
+    assert end == date(2026, 3, 31)
+
+
+def test_parse_date_range_abbreviated_months():
+    start, end = parse_date_range("Jun to Aug 2025")
+    assert start == date(2025, 6, 1)
+    assert end == date(2025, 8, 31)
+
+
+def test_parse_date_range_dmy_slash():
+    start, end = parse_date_range("08/03/2026 to 29/03/2026")
+    assert start == date(2026, 3, 8)
+    assert end == date(2026, 3, 29)
+
+
+def test_parse_date_range_dmy_dash():
+    start, end = parse_date_range("01-06-2025 to 31-08-2025")
+    assert start == date(2025, 6, 1)
+    assert end == date(2025, 8, 31)
+
+
+def test_parse_date_range_february_single():
+    start, end = parse_date_range("February 2026")
+    assert start == date(2026, 2, 1)
+    assert end == date(2026, 2, 28)
+
+
 def test_parse_date_range_invalid_raises():
     with pytest.raises(ValueError):
         parse_date_range("not a date")

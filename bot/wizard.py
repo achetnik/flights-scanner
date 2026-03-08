@@ -13,6 +13,10 @@ MONTH_MAP = {
     "january": 1, "february": 2, "march": 3, "april": 4,
     "may": 5, "june": 6, "july": 7, "august": 8,
     "september": 9, "october": 10, "november": 11, "december": 12,
+    # Abbreviations
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4,
+    "jun": 6, "jul": 7, "aug": 8,
+    "sep": 9, "oct": 10, "nov": 11, "dec": 12,
 }
 
 # Conversation states
@@ -46,8 +50,28 @@ def parse_airlines(text: str) -> List[str]:
     return list(set(result)) if result else list(AIRLINE_OPTIONS.values())
 
 
+def _lookup_month(name: str) -> int:
+    """Resolve a month name or abbreviation to a month number (1-12)."""
+    m = MONTH_MAP.get(name.lower())
+    if m is None:
+        raise ValueError(f"Unknown month: {name!r}")
+    return m
+
+
 def parse_date_range(text: str) -> Tuple[date, date]:
-    # Try ISO: "2025-06-01 to 2025-08-31"
+    """Parse a date-range string into (start, end) dates.
+
+    Supported formats:
+      • 2025-06-01 to 2025-08-31    (ISO)
+      • 01/06/2025 to 31/08/2025     (DD/MM/YYYY)
+      • June to August 2025          (natural, full months)
+      • Jun to Aug 2025              (abbreviated months)
+      • March 2026                   (single month)
+      • Mar 2026                     (single month, abbreviated)
+    """
+    text = text.strip()
+
+    # --- ISO: "2025-06-01 to 2025-08-31" ---
     iso_match = re.search(
         r"(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})", text, re.IGNORECASE
     )
@@ -56,7 +80,19 @@ def parse_date_range(text: str) -> Tuple[date, date]:
         end = date.fromisoformat(iso_match.group(2))
         return start, end
 
-    # Try natural: "June to August 2025"
+    # --- DD/MM/YYYY: "08/03/2026 to 29/03/2026" or "08-03-2026 to 29-03-2026" ---
+    dmy_match = re.search(
+        r"(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})\s+to\s+(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})",
+        text, re.IGNORECASE,
+    )
+    if dmy_match:
+        d1, m1, y1 = int(dmy_match.group(1)), int(dmy_match.group(2)), int(dmy_match.group(3))
+        d2, m2, y2 = int(dmy_match.group(4)), int(dmy_match.group(5)), int(dmy_match.group(6))
+        start = date(y1, m1, d1)
+        end = date(y2, m2, d2)
+        return start, end
+
+    # --- Natural range: "June to August 2025" / "Jun to Aug 2025" ---
     natural_match = re.search(
         r"([a-z]+)\s+to\s+([a-z]+)\s+(\d{4})", text, re.IGNORECASE
     )
@@ -70,9 +106,20 @@ def parse_date_range(text: str) -> Tuple[date, date]:
             end = date(year, m2, last_day)
             return start, end
 
+    # --- Single month: "March 2026" / "Mar 2026" ---
+    single_match = re.search(r"([a-z]+)\s+(\d{4})", text, re.IGNORECASE)
+    if single_match:
+        m = MONTH_MAP.get(single_match.group(1).lower())
+        year = int(single_match.group(2))
+        if m:
+            start = date(year, m, 1)
+            last_day = calendar.monthrange(year, m)[1]
+            end = date(year, m, last_day)
+            return start, end
+
     raise ValueError(
         f"Cannot parse date range: {text!r}. "
-        "Use 'YYYY-MM-DD to YYYY-MM-DD' or 'Month to Month YYYY'"
+        "Use 'YYYY-MM-DD to YYYY-MM-DD', 'Month to Month YYYY', or 'Month YYYY'"
     )
 
 
@@ -108,7 +155,7 @@ async def ask_airlines(update, context):
 async def ask_date_range(update, context):
     context.user_data["airlines"] = parse_airlines(update.message.text)
     await update.message.reply_text(
-        "Date range? (e.g. `2025-06-01 to 2025-08-31` or `June to August 2025`)",
+        "Date range? (e.g. `2025-06-01 to 2025-08-31`, `June to August 2025`, or `June 2025`)",
         parse_mode="Markdown",
     )
     return ASK_DATE_RANGE
